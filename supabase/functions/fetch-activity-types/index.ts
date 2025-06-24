@@ -40,11 +40,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Fetching activity types from Velaris API');
 
-    // Fetch activity types from Velaris API
+    // Fetch activity types from Velaris API using Basic auth
     const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/activity-type', {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${config.velaris_token_encrypted}`,
+        'Authorization': `Basic ${config.velaris_token_encrypted}`,
       },
     });
 
