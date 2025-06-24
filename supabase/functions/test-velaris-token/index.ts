@@ -22,11 +22,11 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Token is required');
     }
 
-    // Test the token by fetching activity types
+    // Test the token by fetching activity types with correct header
     const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/activity-type', {
       headers: {
-        'Authorization': `Basic ${token}`,
         'Content-Type': 'application/json',
+        'x-velaris-internal-token': token,
       },
     });
 

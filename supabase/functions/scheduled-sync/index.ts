@@ -136,12 +136,12 @@ async function syncUserCalls(supabase: any, config: any) {
       // Process the call and create activity in Velaris
       const activityData = await processGongCall(callDetails, config, dedupRules || []);
       
-      // Create activity in Velaris
+      // Create activity in Velaris with correct header
       const velarisResponse = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/activities', {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${config.velaris_token_encrypted}`,
           'Content-Type': 'application/json',
+          'x-velaris-internal-token': config.velaris_token_encrypted,
         },
         body: JSON.stringify(activityData),
       });
@@ -247,8 +247,8 @@ async function searchVelarisOrganizations(token: string, fieldName: string, valu
   const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/v2/organizations/search', {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${token}`,
       'Content-Type': 'application/json',
+      'x-velaris-internal-token': token,
     },
     body: JSON.stringify({
       filters: [{
@@ -268,8 +268,8 @@ async function searchVelarisAccounts(token: string, fieldName: string, value: st
   const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/v2/accounts/search', {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${token}`,
       'Content-Type': 'application/json',
+      'x-velaris-internal-token': token,
     },
     body: JSON.stringify({
       filters: [{
@@ -289,8 +289,8 @@ async function searchVelarisContacts(token: string, emails: string[]) {
   const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/v2/contacts/batch/read', {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${token}`,
       'Content-Type': 'application/json',
+      'x-velaris-internal-token': token,
     },
     body: JSON.stringify({
       property: 'email',
@@ -307,8 +307,8 @@ async function searchVelarisUsers(token: string, emails: string[]) {
   const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/v2/users/batch/read', {
     method: 'POST',
     headers: {
-      'Authorization': `Basic ${token}`,
       'Content-Type': 'application/json',
+      'x-velaris-internal-token': token,
     },
     body: JSON.stringify({
       property: 'email',
