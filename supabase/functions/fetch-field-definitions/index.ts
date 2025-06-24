@@ -40,11 +40,11 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Fetching field definitions from Velaris API');
 
-    // Fetch field definitions from Velaris API using Basic auth
+    // Fetch field definitions from Velaris API using Bearer auth
     const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/field-definitions?entityType=organisation,account', {
       headers: {
         'Content-Type': 'application/json',
-        'Authorization': `Basic ${config.velaris_token_encrypted}`,
+        'Authorization': `Bearer ${config.velaris_token_encrypted}`,
       },
     });
 
