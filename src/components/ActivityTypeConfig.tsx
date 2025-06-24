@@ -12,6 +12,8 @@ import { supabase } from "@/integrations/supabase/client";
 interface ActivityType {
   id: string;
   name: string;
+  description?: string;
+  iconName?: string;
 }
 
 export const ActivityTypeConfig = () => {
@@ -39,6 +41,7 @@ export const ActivityTypeConfig = () => {
 
       if (config) {
         setSelectedActivityType(config.selected_activity_type_id || "");
+        // If token exists, automatically load activity types
         if (config.velaris_token_encrypted) {
           loadActivityTypes();
         }
@@ -51,28 +54,40 @@ export const ActivityTypeConfig = () => {
   const loadActivityTypes = async () => {
     setLoadingTypes(true);
     try {
-      // Simulate API call to Velaris
-      // In real implementation, this would call the Velaris API
-      const mockActivityTypes = [
-        { id: "call", name: "Call" },
-        { id: "meeting", name: "Meeting" },
-        { id: "demo", name: "Demo" },
-        { id: "discovery", name: "Discovery Call" },
-        { id: "follow-up", name: "Follow-up" },
-        { id: "onboarding", name: "Onboarding Session" },
-      ];
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        throw new Error('Not authenticated');
+      }
 
-      setActivityTypes(mockActivityTypes);
+      console.log('Calling fetch-activity-types function');
+      
+      const { data, error } = await supabase.functions.invoke('fetch-activity-types', {
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Invalid response format from activity types API');
+      }
+
+      setActivityTypes(data);
       setTypesLoaded(true);
       
       toast({
         title: "Success",
-        description: "Activity types loaded successfully",
+        description: `Loaded ${data.length} activity types from Velaris`,
       });
     } catch (error) {
+      console.error('Error loading activity types:', error);
       toast({
         title: "Error",
-        description: "Failed to load activity types. Please check your Velaris token.",
+        description: error instanceof Error ? error.message : "Failed to load activity types. Please check your Velaris token.",
         variant: "destructive",
       });
     } finally {
@@ -166,7 +181,12 @@ export const ActivityTypeConfig = () => {
                 <SelectContent>
                   {activityTypes.map((type) => (
                     <SelectItem key={type.id} value={type.id}>
-                      {type.name}
+                      <div className="flex flex-col">
+                        <span>{type.name}</span>
+                        {type.description && (
+                          <span className="text-xs text-muted-foreground">{type.description}</span>
+                        )}
+                      </div>
                     </SelectItem>
                   ))}
                 </SelectContent>
