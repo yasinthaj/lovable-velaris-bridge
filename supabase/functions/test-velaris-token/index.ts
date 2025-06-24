@@ -26,7 +26,7 @@ const handler = async (req: Request): Promise<Response> => {
     const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/activity-type', {
       headers: {
         'Content-Type': 'application/json',
-        'x-velaris-internal-token': token,
+        'Authorization': `Bearer ${token}`,
       },
     });
 

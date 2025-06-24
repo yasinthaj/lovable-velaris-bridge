@@ -141,7 +141,7 @@ async function syncUserCalls(supabase: any, config: any) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-velaris-internal-token': config.velaris_token_encrypted,
+          'Authorization': `Bearer ${config.velaris_token_encrypted}`,
         },
         body: JSON.stringify(activityData),
       });
@@ -248,7 +248,7 @@ async function searchVelarisOrganizations(token: string, fieldName: string, valu
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-velaris-internal-token': token,
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({
       filters: [{
@@ -269,7 +269,7 @@ async function searchVelarisAccounts(token: string, fieldName: string, value: st
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-velaris-internal-token': token,
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({
       filters: [{
@@ -290,7 +290,7 @@ async function searchVelarisContacts(token: string, emails: string[]) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-velaris-internal-token': token,
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({
       property: 'email',
@@ -308,7 +308,7 @@ async function searchVelarisUsers(token: string, emails: string[]) {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
-      'x-velaris-internal-token': token,
+      'Authorization': `Bearer ${token}`,
     },
     body: JSON.stringify({
       property: 'email',
