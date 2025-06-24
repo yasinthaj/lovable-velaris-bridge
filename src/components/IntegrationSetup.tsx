@@ -16,20 +16,10 @@ export const IntegrationSetup = () => {
   const [webhookUrl, setWebhookUrl] = useState("");
   const [showGongSecret, setShowGongSecret] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [generatingWebhook, setGeneratingWebhook] = useState(false);
   const [tokenSaved, setTokenSaved] = useState(false);
   const [gongCredentialsSaved, setGongCredentialsSaved] = useState(false);
   const { toast } = useToast();
-
-  // Generate webhook URL
-  const generateWebhookUrl = async () => {
-    const { data: { user } } = await supabase.auth.getUser();
-    if (user) {
-      const url = `https://vtoewarlzpjosljkhtwn.supabase.co/functions/v1/gong-webhook?user_id=${user.id}`;
-      setWebhookUrl(url);
-      return url;
-    }
-    return "";
-  };
 
   // Load existing configuration
   useEffect(() => {
@@ -52,14 +42,43 @@ export const IntegrationSetup = () => {
         setGongCredentialsSaved(!!config.gong_api_key_encrypted);
         if (config.webhook_url) {
           setWebhookUrl(config.webhook_url);
-        } else {
-          await generateWebhookUrl();
         }
-      } else {
-        await generateWebhookUrl();
       }
     } catch (error) {
       console.error("Error loading configuration:", error);
+    }
+  };
+
+  const generateWebhookUrl = async () => {
+    setGeneratingWebhook(true);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) throw new Error("User not authenticated");
+
+      const url = `https://vtoewarlzpjosljkhtwn.supabase.co/functions/v1/gong-webhook?user_id=${user.id}`;
+      
+      // Save the webhook URL to the database
+      const { error } = await supabase.from("integration_configs").upsert({
+        user_id: user.id,
+        webhook_url: url,
+        updated_at: new Date().toISOString(),
+      });
+
+      if (error) throw error;
+
+      setWebhookUrl(url);
+      toast({
+        title: "Success",
+        description: "Webhook URL generated successfully",
+      });
+    } catch (error) {
+      toast({
+        title: "Error",
+        description: error instanceof Error ? error.message : "Failed to generate webhook URL",
+        variant: "destructive",
+      });
+    } finally {
+      setGeneratingWebhook(false);
     }
   };
 
@@ -89,12 +108,9 @@ export const IntegrationSetup = () => {
         throw new Error("Invalid Velaris token");
       }
 
-      const webhookUrlToSave = webhookUrl || await generateWebhookUrl();
-
       const { error } = await supabase.from("integration_configs").upsert({
         user_id: user.id,
         velaris_token_encrypted: velarisToken, // In production, encrypt this
-        webhook_url: webhookUrlToSave,
         updated_at: new Date().toISOString(),
       });
 
@@ -159,6 +175,7 @@ export const IntegrationSetup = () => {
   };
 
   const copyWebhookUrl = () => {
+    if (!webhookUrl) return;
     navigator.clipboard.writeText(webhookUrl);
     toast({
       title: "Copied",
@@ -217,7 +234,7 @@ export const IntegrationSetup = () => {
             Webhook Setup (Real-time)
           </CardTitle>
           <CardDescription>
-            Use this webhook URL in your Gong integration settings for real-time sync
+            Generate a webhook URL to configure in your Gong integration settings for real-time sync
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -225,24 +242,39 @@ export const IntegrationSetup = () => {
             <Label>Webhook URL</Label>
             <div className="flex items-center gap-2">
               <Input
-                value={webhookUrl}
+                value={webhookUrl || "No webhook URL generated yet"}
                 readOnly
                 className="flex-1 bg-slate-50"
+                placeholder="Click 'Generate Webhook URL' to create"
               />
               <Button
                 variant="outline"
                 size="icon"
                 onClick={copyWebhookUrl}
                 disabled={!webhookUrl}
+                title="Copy webhook URL"
               >
                 <Copy className="w-4 h-4" />
               </Button>
             </div>
           </div>
-          <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg">
-            <AlertCircle className="w-4 h-4" />
-            <span>Configure this URL in your Gong webhook settings to enable real-time sync</span>
+          
+          <div className="flex gap-2">
+            <Button
+              onClick={generateWebhookUrl}
+              disabled={generatingWebhook}
+              className="flex-1"
+            >
+              {generatingWebhook ? "Generating..." : "Generate Webhook URL"}
+            </Button>
           </div>
+
+          {webhookUrl && (
+            <div className="flex items-center gap-2 text-sm text-amber-700 bg-amber-50 p-3 rounded-lg">
+              <AlertCircle className="w-4 h-4" />
+              <span>Configure this URL in your Gong webhook settings to enable real-time sync</span>
+            </div>
+          )}
         </CardContent>
       </Card>
 
