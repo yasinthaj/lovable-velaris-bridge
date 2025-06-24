@@ -64,29 +64,40 @@ export const DeduplicationRules = () => {
   const loadFieldDefinitions = async () => {
     setLoadingFields(true);
     try {
-      // Simulate API call to Velaris field definitions
-      // In real implementation, this would call the Velaris API
-      const mockFieldDefinitions = [
-        { name: "name", label: "Organization Name", entity_type: "organisation" },
-        { name: "domain", label: "Domain", entity_type: "organisation" },
-        { name: "industry", label: "Industry", entity_type: "organisation" },
-        { name: "account_name", label: "Account Name", entity_type: "account" },
-        { name: "account_id", label: "Account ID", entity_type: "account" },
-        { name: "tier", label: "Account Tier", entity_type: "account" },
-        { name: "mrr", label: "Monthly Recurring Revenue", entity_type: "account" },
-      ];
+      const { data: session } = await supabase.auth.getSession();
+      if (!session.session) {
+        throw new Error('Not authenticated');
+      }
 
-      setFieldDefinitions(mockFieldDefinitions);
+      console.log('Calling fetch-field-definitions function');
+      
+      const { data, error } = await supabase.functions.invoke('fetch-field-definitions', {
+        headers: {
+          Authorization: `Bearer ${session.session.access_token}`,
+        },
+      });
+
+      if (error) {
+        console.error('Supabase function error:', error);
+        throw error;
+      }
+
+      if (!data || !Array.isArray(data)) {
+        throw new Error('Invalid response format from field definitions API');
+      }
+
+      setFieldDefinitions(data);
       setFieldsLoaded(true);
       
       toast({
         title: "Success",
-        description: "Field definitions loaded successfully",
+        description: `Loaded ${data.length} field definitions from Velaris`,
       });
     } catch (error) {
+      console.error('Error loading field definitions:', error);
       toast({
         title: "Error",
-        description: "Failed to load field definitions. Please check your Velaris token.",
+        description: error instanceof Error ? error.message : "Failed to load field definitions. Please check your Velaris token.",
         variant: "destructive",
       });
     } finally {
