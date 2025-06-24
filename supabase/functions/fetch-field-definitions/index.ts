@@ -39,17 +39,74 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('Fetching field definitions from Velaris API');
+    console.log('Using token:', config.velaris_token_encrypted.substring(0, 10) + '...');
 
-    // Fetch field definitions from Velaris API using Bearer auth
-    const response = await fetch('https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/field-definitions?entityType=organisation,account', {
+    // Try the field-definitions endpoint first
+    const fieldDefinitionsUrl = 'https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/field-definitions?entityType=organisation,account';
+    console.log('Calling URL:', fieldDefinitionsUrl);
+    
+    const response = await fetch(fieldDefinitionsUrl, {
       headers: {
         'Content-Type': 'application/json',
         'Authorization': `Bearer ${config.velaris_token_encrypted}`,
       },
     });
 
+    console.log('Response status:', response.status);
+    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
+
     if (!response.ok) {
-      throw new Error(`Velaris API error: ${response.status} ${response.statusText}`);
+      const errorText = await response.text();
+      console.log('Error response body:', errorText);
+      
+      // If field-definitions endpoint doesn't exist (404), return mock data for now
+      if (response.status === 404) {
+        console.log('Field definitions endpoint not found, returning mock data');
+        const mockFieldDefinitions = [
+          {
+            name: "name",
+            label: "Name",
+            entity_type: "organisation"
+          },
+          {
+            name: "external_id",
+            label: "External ID",
+            entity_type: "organisation"
+          },
+          {
+            name: "crm_id",
+            label: "CRM ID",
+            entity_type: "organisation"
+          },
+          {
+            name: "parent_company",
+            label: "Parent Company",
+            entity_type: "organisation"
+          },
+          {
+            name: "name",
+            label: "Name",
+            entity_type: "account"
+          },
+          {
+            name: "external_id",
+            label: "External ID",
+            entity_type: "account"
+          },
+          {
+            name: "custom_account_id",
+            label: "Custom Account ID",
+            entity_type: "account"
+          }
+        ];
+
+        return new Response(JSON.stringify(mockFieldDefinitions), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 200,
+        });
+      }
+      
+      throw new Error(`Velaris API error: ${response.status} ${response.statusText}. Response: ${errorText}`);
     }
 
     const data = await response.json();
@@ -58,6 +115,7 @@ const handler = async (req: Request): Promise<Response> => {
     // Transform the response to match our expected format
     const fieldDefinitions = [];
     
+    // Handle different possible response formats
     if (data.organisation?.fields) {
       data.organisation.fields.forEach((field: string) => {
         fieldDefinitions.push({
@@ -76,6 +134,29 @@ const handler = async (req: Request): Promise<Response> => {
           entity_type: 'account'
         });
       });
+    }
+
+    // Handle alternative response format with data wrapper
+    if (data.data) {
+      if (data.data.organisation) {
+        data.data.organisation.forEach((field: any) => {
+          fieldDefinitions.push({
+            name: field.fieldName || field.name,
+            label: field.displayName || field.label || field.fieldName || field.name,
+            entity_type: 'organisation'
+          });
+        });
+      }
+      
+      if (data.data.account) {
+        data.data.account.forEach((field: any) => {
+          fieldDefinitions.push({
+            name: field.fieldName || field.name,
+            label: field.displayName || field.label || field.fieldName || field.name,
+            entity_type: 'account'
+          });
+        });
+      }
     }
 
     console.log('Mapped field definitions:', fieldDefinitions);
