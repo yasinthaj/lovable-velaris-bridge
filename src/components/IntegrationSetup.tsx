@@ -21,10 +21,23 @@ export const IntegrationSetup = () => {
   const [gongCredentialsSaved, setGongCredentialsSaved] = useState(false);
   const { toast } = useToast();
 
-  // Load existing configuration
+  // Check if user is authenticated
   useEffect(() => {
-    loadConfiguration();
+    checkAuthAndLoadConfig();
   }, []);
+
+  const checkAuthAndLoadConfig = async () => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) {
+      toast({
+        title: "Authentication Required",
+        description: "Please sign in to configure the integration",
+        variant: "destructive",
+      });
+      return;
+    }
+    await loadConfiguration();
+  };
 
   const loadConfiguration = async () => {
     try {
@@ -97,14 +110,12 @@ export const IntegrationSetup = () => {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("User not authenticated");
 
-      // Test the token first by fetching activity types
-      const testResponse = await fetch("/api/test-velaris-token", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ token: velarisToken }),
+      // Test the token first
+      const { data: testResult } = await supabase.functions.invoke('test-velaris-token', {
+        body: { token: velarisToken }
       });
 
-      if (!testResponse.ok) {
+      if (!testResult?.valid) {
         throw new Error("Invalid Velaris token");
       }
 
@@ -150,7 +161,7 @@ export const IntegrationSetup = () => {
 
       const { error } = await supabase.from("integration_configs").upsert({
         user_id: user.id,
-        gong_api_key_encrypted: gongKey, // In production, encrypt this
+        gong_api_key_encrypted: `${gongKey}:${gongSecret}`, // In production, encrypt this
         updated_at: new Date().toISOString(),
       });
 

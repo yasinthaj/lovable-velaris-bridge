@@ -1,14 +1,14 @@
 
 import { useState } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { IntegrationSetup } from "@/components/IntegrationSetup";
 import { SyncConfiguration } from "@/components/SyncConfiguration";
+import { AuthWrapper } from "@/components/AuthWrapper";
 import { Settings, Zap } from "lucide-react";
 
 const Index = () => {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
+    <AuthWrapper>
       <div className="container mx-auto px-4 py-8">
         <div className="max-w-6xl mx-auto">
           {/* Header */}
@@ -45,7 +45,7 @@ const Index = () => {
           </Tabs>
         </div>
       </div>
-    </div>
+    </AuthWrapper>
   );
 };
 
