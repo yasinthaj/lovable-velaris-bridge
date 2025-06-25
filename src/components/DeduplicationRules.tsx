@@ -242,15 +242,6 @@ export const DeduplicationRules = () => {
               </div>
 
               <div className="space-y-2">
-                <Label>Gong Field</Label>
-                <Input
-                  placeholder="e.g., company_name"
-                  value={newRule.gong_field}
-                  onChange={(e) => setNewRule({ ...newRule, gong_field: e.target.value })}
-                />
-              </div>
-
-              <div className="space-y-2">
                 <Label>Velaris Field</Label>
                 <Select
                   value={newRule.velaris_field}
@@ -268,6 +259,15 @@ export const DeduplicationRules = () => {
                     ))}
                   </SelectContent>
                 </Select>
+              </div>
+
+              <div className="space-y-2">
+                <Label>Gong Field</Label>
+                <Input
+                  placeholder="e.g., company_name"
+                  value={newRule.gong_field}
+                  onChange={(e) => setNewRule({ ...newRule, gong_field: e.target.value })}
+                />
               </div>
             </div>
 
@@ -289,8 +289,8 @@ export const DeduplicationRules = () => {
                 <TableHeader>
                   <TableRow>
                     <TableHead>Entity Type</TableHead>
-                    <TableHead>Gong Field</TableHead>
                     <TableHead>Velaris Field</TableHead>
+                    <TableHead>Gong Field</TableHead>
                     <TableHead>Created</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
@@ -304,10 +304,10 @@ export const DeduplicationRules = () => {
                         </Badge>
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {rule.gong_field}
+                        {rule.velaris_field}
                       </TableCell>
                       <TableCell className="font-mono text-sm">
-                        {rule.velaris_field}
+                        {rule.gong_field}
                       </TableCell>
                       <TableCell className="text-sm text-muted-foreground">
                         {new Date(rule.created_at).toLocaleDateString()}

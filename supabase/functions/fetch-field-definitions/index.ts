@@ -27,6 +27,8 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Unauthorized');
     }
 
+    console.log('Fetching integration config for user:', user.id);
+
     // Get user's integration config to retrieve Velaris token
     const { data: config, error: configError } = await supabase
       .from('integration_configs')
@@ -39,72 +41,23 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     console.log('Fetching field definitions from Velaris API');
-    console.log('Using token:', config.velaris_token_encrypted.substring(0, 10) + '...');
-
-    // Try the field-definitions endpoint first
+    
+    // Call Velaris API using the user's token
     const fieldDefinitionsUrl = 'https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/field-definitions?entityType=organisation,account';
     console.log('Calling URL:', fieldDefinitionsUrl);
     
     const response = await fetch(fieldDefinitionsUrl, {
       headers: {
-        'Content-Type': 'application/json',
         'Authorization': `Bearer ${config.velaris_token_encrypted}`,
+        'Content-Type': 'application/json',
       },
     });
 
     console.log('Response status:', response.status);
-    console.log('Response headers:', Object.fromEntries(response.headers.entries()));
 
     if (!response.ok) {
       const errorText = await response.text();
       console.log('Error response body:', errorText);
-      
-      // If field-definitions endpoint doesn't exist (404), return mock data for now
-      if (response.status === 404) {
-        console.log('Field definitions endpoint not found, returning mock data');
-        const mockFieldDefinitions = [
-          {
-            name: "name",
-            label: "Name",
-            entity_type: "organisation"
-          },
-          {
-            name: "external_id",
-            label: "External ID",
-            entity_type: "organisation"
-          },
-          {
-            name: "crm_id",
-            label: "CRM ID",
-            entity_type: "organisation"
-          },
-          {
-            name: "parent_company",
-            label: "Parent Company",
-            entity_type: "organisation"
-          },
-          {
-            name: "name",
-            label: "Name",
-            entity_type: "account"
-          },
-          {
-            name: "external_id",
-            label: "External ID",
-            entity_type: "account"
-          },
-          {
-            name: "custom_account_id",
-            label: "Custom Account ID",
-            entity_type: "account"
-          }
-        ];
-
-        return new Response(JSON.stringify(mockFieldDefinitions), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-          status: 200,
-        });
-      }
       
       throw new Error(`Velaris API error: ${response.status} ${response.statusText}. Response: ${errorText}`);
     }
@@ -115,7 +68,32 @@ const handler = async (req: Request): Promise<Response> => {
     // Transform the response to match our expected format
     const fieldDefinitions = [];
     
-    // Handle different possible response formats
+    // Handle the expected response format from Velaris
+    if (data.data) {
+      // Handle organisation fields
+      if (data.data.organisation && Array.isArray(data.data.organisation)) {
+        data.data.organisation.forEach((field: any) => {
+          fieldDefinitions.push({
+            name: field.fieldName || field.name,
+            label: field.displayName || field.label || field.fieldName || field.name,
+            entity_type: 'organisation'
+          });
+        });
+      }
+      
+      // Handle account fields
+      if (data.data.account && Array.isArray(data.data.account)) {
+        data.data.account.forEach((field: any) => {
+          fieldDefinitions.push({
+            name: field.fieldName || field.name,
+            label: field.displayName || field.label || field.fieldName || field.name,
+            entity_type: 'account'
+          });
+        });
+      }
+    }
+
+    // Handle alternative response formats
     if (data.organisation?.fields) {
       data.organisation.fields.forEach((field: string) => {
         fieldDefinitions.push({
@@ -136,27 +114,19 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
 
-    // Handle alternative response format with data wrapper
-    if (data.data) {
-      if (data.data.organisation) {
-        data.data.organisation.forEach((field: any) => {
-          fieldDefinitions.push({
-            name: field.fieldName || field.name,
-            label: field.displayName || field.label || field.fieldName || field.name,
-            entity_type: 'organisation'
-          });
-        });
-      }
-      
-      if (data.data.account) {
-        data.data.account.forEach((field: any) => {
-          fieldDefinitions.push({
-            name: field.fieldName || field.name,
-            label: field.displayName || field.label || field.fieldName || field.name,
-            entity_type: 'account'
-          });
-        });
-      }
+    // If we still don't have any field definitions, provide some common defaults
+    if (fieldDefinitions.length === 0) {
+      console.log('No field definitions found in response, using defaults');
+      const defaultFields = [
+        { name: "name", label: "Name", entity_type: "organisation" },
+        { name: "external_id", label: "External ID", entity_type: "organisation" },
+        { name: "crm_id", label: "CRM ID", entity_type: "organisation" },
+        { name: "parent_company", label: "Parent Company", entity_type: "organisation" },
+        { name: "name", label: "Name", entity_type: "account" },
+        { name: "external_id", label: "External ID", entity_type: "account" },
+        { name: "custom_account_id", label: "Custom Account ID", entity_type: "account" }
+      ];
+      fieldDefinitions.push(...defaultFields);
     }
 
     console.log('Mapped field definitions:', fieldDefinitions);
