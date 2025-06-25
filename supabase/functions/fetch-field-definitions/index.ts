@@ -42,89 +42,44 @@ const handler = async (req: Request): Promise<Response> => {
 
     console.log('Making separate API calls to Velaris for organisation and account fields');
     
-    const baseUrl = 'https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/csm/v1/bfp/field-definitions';
     const headers = {
       'Authorization': `Bearer ${config.velaris_token_encrypted}`,
       'Content-Type': 'application/json',
     };
 
-    // Make separate API calls for organisation and account
-    const [orgResponse, accountResponse] = await Promise.all([
-      fetch(`${baseUrl}?entityType=organisation`, { headers }),
-      fetch(`${baseUrl}?entityType=account`, { headers })
-    ]);
+    async function fetchFor(entityType: string) {
+      const url = `https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/csm/v1/bfp/field-definitions?entityType=${entityType}`;
+      console.log(`Fetching ${entityType} fields from:`, url);
+      
+      const res = await fetch(url, { method: 'GET', headers });
 
-    console.log('Organisation API response status:', orgResponse.status);
-    console.log('Account API response status:', accountResponse.status);
+      console.log(`${entityType} API response status:`, res.status);
 
-    // Check if both requests were successful
-    if (!orgResponse.ok) {
-      const orgErrorText = await orgResponse.text();
-      console.log('Organisation API error response:', orgErrorText);
-      throw new Error(`Velaris API error for organisation: ${orgResponse.status} ${orgResponse.statusText}`);
+      if (!res.ok) {
+        const errorText = await res.text();
+        console.log(`${entityType} API error response:`, errorText);
+        throw new Error(`Failed to fetch ${entityType} fields: ${res.status} ${res.statusText}`);
+      }
+
+      const json = await res.json();
+      console.log(`${entityType} fields response:`, JSON.stringify(json, null, 2));
+      
+      return (json.data || []).map((field: any) => ({
+        name: field.fieldName || field.name || field.id,
+        label: field.displayName || field.label || field.fieldName || field.name || field.id,
+        entity_type: entityType, // needed by frontend filter logic
+      }));
     }
 
-    if (!accountResponse.ok) {
-      const accountErrorText = await accountResponse.text();
-      console.log('Account API error response:', accountErrorText);
-      throw new Error(`Velaris API error for account: ${accountResponse.status} ${accountResponse.statusText}`);
-    }
+    // Fetch both entity types
+    const organisationFields = await fetchFor("organisation");
+    const accountFields = await fetchFor("account");
 
-    // Parse responses
-    const orgData = await orgResponse.json();
-    const accountData = await accountResponse.json();
-
-    console.log('Organisation fields response:', JSON.stringify(orgData, null, 2));
-    console.log('Account fields response:', JSON.stringify(accountData, null, 2));
-
-    // Transform and merge the responses
-    const fieldDefinitions = [];
-    
-    // Process organisation fields
-    if (orgData && orgData.data && Array.isArray(orgData.data)) {
-      orgData.data.forEach((field: any) => {
-        fieldDefinitions.push({
-          name: field.fieldName || field.name || field.id,
-          label: field.displayName || field.label || field.fieldName || field.name || field.id,
-          entity_type: 'organisation'
-        });
-      });
-    }
-    
-    // Process account fields
-    if (accountData && accountData.data && Array.isArray(accountData.data)) {
-      accountData.data.forEach((field: any) => {
-        fieldDefinitions.push({
-          name: field.fieldName || field.name || field.id,
-          label: field.displayName || field.label || field.fieldName || field.name || field.id,
-          entity_type: 'account'
-        });
-      });
-    }
-
-    // Handle alternative response formats if needed
-    if (orgData.fields && Array.isArray(orgData.fields)) {
-      orgData.fields.forEach((field: string) => {
-        fieldDefinitions.push({
-          name: field,
-          label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' '),
-          entity_type: 'organisation'
-        });
-      });
-    }
-    
-    if (accountData.fields && Array.isArray(accountData.fields)) {
-      accountData.fields.forEach((field: string) => {
-        fieldDefinitions.push({
-          name: field,
-          label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' '),
-          entity_type: 'account'
-        });
-      });
-    }
+    // Combine the results
+    const allFields = [...organisationFields, ...accountFields];
 
     // If we still don't have any field definitions, provide some common defaults
-    if (fieldDefinitions.length === 0) {
+    if (allFields.length === 0) {
       console.log('No field definitions found in responses, using defaults');
       const defaultFields = [
         { name: "name", label: "Name", entity_type: "organisation" },
@@ -135,12 +90,12 @@ const handler = async (req: Request): Promise<Response> => {
         { name: "external_id", label: "External ID", entity_type: "account" },
         { name: "custom_account_id", label: "Custom Account ID", entity_type: "account" }
       ];
-      fieldDefinitions.push(...defaultFields);
+      allFields.push(...defaultFields);
     }
 
-    console.log('Final merged field definitions:', JSON.stringify(fieldDefinitions, null, 2));
+    console.log('Final merged field definitions:', JSON.stringify(allFields, null, 2));
 
-    return new Response(JSON.stringify(fieldDefinitions), {
+    return new Response(JSON.stringify(allFields), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       status: 200,
     });
