@@ -40,62 +40,71 @@ const handler = async (req: Request): Promise<Response> => {
       throw new Error('Velaris token not found. Please configure your integration first.');
     }
 
-    console.log('Fetching field definitions from Velaris API');
+    console.log('Making separate API calls to Velaris for organisation and account fields');
     
-    // Call Velaris API using the user's token
-    const fieldDefinitionsUrl = 'https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/field-definitions?entityType=organisation,account';
-    console.log('Calling URL:', fieldDefinitionsUrl);
-    
-    const response = await fetch(fieldDefinitionsUrl, {
-      headers: {
-        'Authorization': `Bearer ${config.velaris_token_encrypted}`,
-        'Content-Type': 'application/json',
-      },
-    });
+    const baseUrl = 'https://ua4t4so3ba.execute-api.eu-west-2.amazonaws.com/prod/csm/v1/bfp/field-definitions';
+    const headers = {
+      'Authorization': `Bearer ${config.velaris_token_encrypted}`,
+      'Content-Type': 'application/json',
+    };
 
-    console.log('Response status:', response.status);
+    // Make separate API calls for organisation and account
+    const [orgResponse, accountResponse] = await Promise.all([
+      fetch(`${baseUrl}?entityType=organisation`, { headers }),
+      fetch(`${baseUrl}?entityType=account`, { headers })
+    ]);
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.log('Error response body:', errorText);
-      
-      throw new Error(`Velaris API error: ${response.status} ${response.statusText}. Response: ${errorText}`);
+    console.log('Organisation API response status:', orgResponse.status);
+    console.log('Account API response status:', accountResponse.status);
+
+    // Check if both requests were successful
+    if (!orgResponse.ok) {
+      const orgErrorText = await orgResponse.text();
+      console.log('Organisation API error response:', orgErrorText);
+      throw new Error(`Velaris API error for organisation: ${orgResponse.status} ${orgResponse.statusText}`);
     }
 
-    const data = await response.json();
-    console.log('Raw Velaris field definitions response:', JSON.stringify(data, null, 2));
+    if (!accountResponse.ok) {
+      const accountErrorText = await accountResponse.text();
+      console.log('Account API error response:', accountErrorText);
+      throw new Error(`Velaris API error for account: ${accountResponse.status} ${accountResponse.statusText}`);
+    }
 
-    // Transform the response to match our expected format
+    // Parse responses
+    const orgData = await orgResponse.json();
+    const accountData = await accountResponse.json();
+
+    console.log('Organisation fields response:', JSON.stringify(orgData, null, 2));
+    console.log('Account fields response:', JSON.stringify(accountData, null, 2));
+
+    // Transform and merge the responses
     const fieldDefinitions = [];
     
-    // Handle the expected response format from Velaris
-    if (data.data) {
-      // Handle organisation fields
-      if (data.data.organisation && Array.isArray(data.data.organisation)) {
-        data.data.organisation.forEach((field: any) => {
-          fieldDefinitions.push({
-            name: field.fieldName || field.name,
-            label: field.displayName || field.label || field.fieldName || field.name,
-            entity_type: 'organisation'
-          });
+    // Process organisation fields
+    if (orgData && orgData.data && Array.isArray(orgData.data)) {
+      orgData.data.forEach((field: any) => {
+        fieldDefinitions.push({
+          name: field.fieldName || field.name || field.id,
+          label: field.displayName || field.label || field.fieldName || field.name || field.id,
+          entity_type: 'organisation'
         });
-      }
-      
-      // Handle account fields
-      if (data.data.account && Array.isArray(data.data.account)) {
-        data.data.account.forEach((field: any) => {
-          fieldDefinitions.push({
-            name: field.fieldName || field.name,
-            label: field.displayName || field.label || field.fieldName || field.name,
-            entity_type: 'account'
-          });
+      });
+    }
+    
+    // Process account fields
+    if (accountData && accountData.data && Array.isArray(accountData.data)) {
+      accountData.data.forEach((field: any) => {
+        fieldDefinitions.push({
+          name: field.fieldName || field.name || field.id,
+          label: field.displayName || field.label || field.fieldName || field.name || field.id,
+          entity_type: 'account'
         });
-      }
+      });
     }
 
-    // Handle alternative response formats
-    if (data.organisation?.fields) {
-      data.organisation.fields.forEach((field: string) => {
+    // Handle alternative response formats if needed
+    if (orgData.fields && Array.isArray(orgData.fields)) {
+      orgData.fields.forEach((field: string) => {
         fieldDefinitions.push({
           name: field,
           label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' '),
@@ -104,8 +113,8 @@ const handler = async (req: Request): Promise<Response> => {
       });
     }
     
-    if (data.account?.fields) {
-      data.account.fields.forEach((field: string) => {
+    if (accountData.fields && Array.isArray(accountData.fields)) {
+      accountData.fields.forEach((field: string) => {
         fieldDefinitions.push({
           name: field,
           label: field.charAt(0).toUpperCase() + field.slice(1).replace(/_/g, ' '),
@@ -116,7 +125,7 @@ const handler = async (req: Request): Promise<Response> => {
 
     // If we still don't have any field definitions, provide some common defaults
     if (fieldDefinitions.length === 0) {
-      console.log('No field definitions found in response, using defaults');
+      console.log('No field definitions found in responses, using defaults');
       const defaultFields = [
         { name: "name", label: "Name", entity_type: "organisation" },
         { name: "external_id", label: "External ID", entity_type: "organisation" },
@@ -129,7 +138,7 @@ const handler = async (req: Request): Promise<Response> => {
       fieldDefinitions.push(...defaultFields);
     }
 
-    console.log('Mapped field definitions:', fieldDefinitions);
+    console.log('Final merged field definitions:', JSON.stringify(fieldDefinitions, null, 2));
 
     return new Response(JSON.stringify(fieldDefinitions), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
